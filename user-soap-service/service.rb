@@ -53,7 +53,7 @@ def create_table
   DB.exec(query)
 end
 
-# Function to store the user in the database
+# Function to store the user in the databaseaaa
 def store_user(username, hashed_password, first_name, last_name, dni, email, city)
   user_id = SecureRandom.uuid
   query = <<-SQL

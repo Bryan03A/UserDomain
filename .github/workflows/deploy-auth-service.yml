@@ -54,6 +54,13 @@ jobs:
                 docker build -t bfury0329/${service}:latest "./$dir"
                 docker push bfury0329/${service}:latest
                 docker rm -f "${service}" 2>/dev/null || true
-                docker run -d --name "${service}" --network app-network bfury0329/${service}:latest
+
+                # Leer puerto expuesto del Dockerfile (el primero que encuentre)
+                port=$(grep -i '^EXPOSE' "$dir/Dockerfile" | head -n 1 | awk '{print $2}')
+                if [ -z "$port" ]; then
+                  port=7000  # default si no encuentra EXPOSE
+                fi
+
+                docker run -d --name "${service}" --network app-network -p ${port}:${port} bfury0329/${service}:latest
               fi
             done
