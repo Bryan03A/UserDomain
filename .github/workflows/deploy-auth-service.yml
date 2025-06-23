@@ -1,4 +1,4 @@
-name: Build and Deploy Changed Microservices
+name: Build, Push, and Deploy All Microservices Sequentially
 
 on:
   push:
@@ -11,31 +11,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Get changed folders
-        id: changed
-        uses: tj-actions/changed-files@v44
-        with:
-          dir_names: "true"
-
-      - name: Filter microservice directories
-        id: filter
-        run: |
-          echo "services=" >> $GITHUB_OUTPUT
-          for dir in ${{ steps.changed.outputs.all_changed_dirs }}; do
-            if [[ -f "$dir/Dockerfile" ]]; then
-              echo "::add-mask::$dir"
-              echo "$dir detected"
-              echo "services+=${dir} " >> $GITHUB_ENV
-            fi
-          done
-
-      - name: Deploy changed microservices
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.0
-        env:
-          SERVICES: ${{ env.services }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
@@ -71,12 +48,12 @@ jobs:
 
             cd ~/deploy-code/UserDomain
 
-            for dir in $SERVICES; do
-              name=$(basename "$dir")
-              if [ -f "$name/Dockerfile" ]; then
-                docker rm -f "$name" 2>/dev/null || true
-                docker build -t bfury0329/$name:latest "$name"
-                docker push bfury0329/$name:latest
-                docker run -d --name "$name" --network app-network bfury0329/$name:latest
+            for dir in */ ; do
+              service=$(basename "$dir")
+              if [ -f "$dir/Dockerfile" ]; then
+                docker build -t bfury0329/${service}:latest "./$dir"
+                docker push bfury0329/${service}:latest
+                docker rm -f "${service}" 2>/dev/null || true
+                docker run -d --name "${service}" --network app-network bfury0329/${service}:latest
               fi
             done

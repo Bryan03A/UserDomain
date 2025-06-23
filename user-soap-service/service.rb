@@ -26,7 +26,7 @@ end
 # Load environment variables
 Dotenv.load
 
-# Setting up the PostgreSQL databaseaaaa
+# Setting up the PostgreSQL database
 DB = PG.connect(
   dbname: ENV['POSTGRESQL_DATABASE'],
   host: ENV['POSTGRESQL_HOST'],
