@@ -1,4 +1,4 @@
-name: Deploy All Configs to EC2
+name: Clone Repositories Only
 
 on:
   push:
@@ -7,19 +7,14 @@ on:
       - test
     paths:
       - 'auth-service/**'
-      - 'connected-service/**'
-      - 'profile-image-service/**'
-      - 'session-service/**'
-      - 'user-search-service/**'
-      - 'user-soap-service/**'
       - '.github/workflows/**'
 
 jobs:
-  deploy:
+  clone:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy all folders to EC2
+      - name: Clonar solo repositorios en EC2
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -29,33 +24,28 @@ jobs:
             REPO_CODE="https://github.com/Bryan03A/UserDomain.git"
             REPO_ENVS="https://${{ secrets.ENV_REPO_TOKEN }}@github.com/Bryan03A/DomainUsers-envs.git"
 
+            # Crear carpetas si no existen
             mkdir -p ~/deploy-code
             mkdir -p ~/deploy-envs
 
-            echo "Clonando o actualizando repositorios..."
+            # Clonar o actualizar repositorio público
             cd ~/deploy-code
             if [ -d "UserDomain" ]; then
+              echo "Actualizando UserDomain..."
               cd UserDomain && git pull origin main && cd ..
             else
+              echo "Clonando UserDomain..."
               git clone $REPO_CODE
             fi
 
+            # Clonar o actualizar repositorio privado
             cd ~/deploy-envs
             if [ -d "DomainUsers-envs" ]; then
+              echo "Actualizando DomainUsers-envs..."
               cd DomainUsers-envs && git pull origin main && cd ..
             else
+              echo "Clonando DomainUsers-envs..."
               git clone $REPO_ENVS
             fi
 
-            echo "Copiando contenido de cada carpeta..."
-            for dir in ~/deploy-envs/DomainUsers-envs/*; do
-              if [ -d "$dir" ]; then
-                folder_name=$(basename "$dir")
-                target="$HOME/deploy-code/UserDomain/$folder_name"
-                mkdir -p "$target"
-                cp -r "$dir/"* "$target/"
-                echo "Contenido copiado de $folder_name"
-              fi
-            done
-
-            echo "✅ Todo copiado correctamente."
+            echo "✅ Repositorios clonados correctamente."
