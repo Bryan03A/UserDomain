@@ -1,49 +1,66 @@
-name: Deploy auth-service on EC2
+name: Deploy Modified Microservice to EC2
 
 on:
   push:
     paths:
-      - 'auth-service/**'
+      - '**/**'  # Detecta cualquier cambio
+    branches:
+      - main
+      - test
 
 jobs:
-  deploy:
+  detect-changes:
     runs-on: ubuntu-latest
+    outputs:
+      changed-dir: ${{ steps.detect.outputs.changed_dir }}
 
     steps:
-      - name: Deploy to EC2 via SSH
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Detect modified folder in root
+        id: detect
+        run: |
+          echo "CHANGED_DIR=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '/' | cut -d/ -f1 | sort -u | head -n1)" >> $GITHUB_ENV
+          echo "changed_dir=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '/' | cut -d/ -f1 | sort -u | head -n1)" >> $GITHUB_OUTPUT
+
+  deploy:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy microservice to EC2
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # Variables
+            SERVICE_DIR="${{ needs.detect-changes.outputs.changed-dir }}"
             REPO_CODE="https://github.com/Bryan03A/UserDomain.git"
             REPO_ENVS="https://${{ secrets.ENV_REPO_TOKEN }}@github.com/Bryan03A/DomainUsers-envs.git"
-            SERVICE_DIR="auth-service"
-            IMAGE_NAME="bfury0329/$SERVICE_DIR"
 
-            # Limpiar despliegue anterior
-            rm -rf ~/deploy-auth
-            mkdir ~/deploy-auth
-            cd ~/deploy-auth
+            # Crear carpetas si no existen
+            mkdir -p ~/deploy-code
+            mkdir -p ~/deploy-envs
 
-            # Clonar repositorios
-            git clone $REPO_CODE
-            git clone $REPO_ENVS
+            cd ~/deploy-code
+            if [ -d "UserDomain" ]; then
+              cd UserDomain && git pull origin main && cd ..
+            else
+              git clone $REPO_CODE
+            fi
 
-            # Copiar .env al microservicio
-            cp DomainUsers-envs/$SERVICE_DIR/.env UserDomain/$SERVICE_DIR/.env
+            cd ~/deploy-envs
+            if [ -d "DomainUsers-envs" ]; then
+              cd DomainUsers-envs && git pull origin main && cd ..
+            else
+              git clone $REPO_ENVS
+            fi
 
-            # Ir al microservicio y construir imagen
-            cd UserDomain/$SERVICE_DIR
-            docker stop $SERVICE_DIR || true
-            docker rm $SERVICE_DIR || true
-            docker rmi $IMAGE_NAME || true
-            docker build -t $IMAGE_NAME .
-
-            # Crear red si no existe
-            docker network inspect app-network >/dev/null 2>&1 || docker network create app-network
-
-            # Ejecutar nuevo contenedor
-            docker run -d --name $SERVICE_DIR --network app-network $IMAGE_NAME
+            # Copiar archivo .env si existe
+            if [ -f ~/deploy-envs/DomainUsers-envs/$SERVICE_DIR/.env ]; then
+              cp ~/deploy-envs/DomainUsers-envs/$SERVICE_DIR/.env ~/deploy-code/UserDomain/$SERVICE_DIR/.env
+              echo "Archivo .env copiado correctamente."
+            else
+              echo "No se encontró archivo .env para $SERVICE_DIR"
+            fi
