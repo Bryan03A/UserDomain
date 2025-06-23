@@ -1,4 +1,4 @@
-name: Clone and Overwrite UserDomain
+name: Build and Push Microservices Sequentially
 
 on:
   push:
@@ -10,11 +10,11 @@ on:
       - '.github/workflows/**'
 
 jobs:
-  clone_and_overwrite:
+  build_and_push:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Clonar repositorios en EC2 y sobrescribir UserDomain
+      - name: Clone, Overwrite and Build One by One
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -24,11 +24,9 @@ jobs:
             REPO_CODE="https://github.com/Bryan03A/UserDomain.git"
             REPO_ENVS="https://${{ secrets.ENV_REPO_TOKEN }}@github.com/Bryan03A/DomainUsers-envs.git"
 
-            # Crear carpetas si no existen
             mkdir -p ~/deploy-code
             mkdir -p ~/deploy-envs
 
-            echo "📦 Clonando UserDomain..."
             cd ~/deploy-code
             if [ -d "UserDomain" ]; then
               cd UserDomain && git pull origin main && cd ..
@@ -36,7 +34,6 @@ jobs:
               git clone $REPO_CODE
             fi
 
-            echo "🔐 Clonando DomainUsers-envs..."
             cd ~/deploy-envs
             if [ -d "DomainUsers-envs" ]; then
               cd DomainUsers-envs && git pull origin main && cd ..
@@ -44,10 +41,14 @@ jobs:
               git clone $REPO_ENVS
             fi
 
-            echo "📁 Sobrescribiendo contenido desde DomainUsers-envs/UserDomain a UserDomain..."
             if [ -d ~/deploy-envs/DomainUsers-envs/UserDomain ]; then
               cp -r -f ~/deploy-envs/DomainUsers-envs/UserDomain/* ~/deploy-code/UserDomain/
-              echo "✅ Contenido de UserDomain sobrescrito correctamente."
-            else
-              echo "⚠️ No se encontró ~/deploy-envs/DomainUsers-envs/UserDomain"
             fi
+
+            cd ~/deploy-code/UserDomain
+
+            for dir in */ ; do
+              service=$(basename "$dir")
+              docker build -t bfury0329/${service}:latest "./$service"
+              docker push bfury0329/${service}:latest
+            done
