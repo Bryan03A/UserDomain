@@ -3,7 +3,7 @@ name: Deploy Modified Microservice to EC2
 on:
   push:
     paths:
-      - '**/**'  # Detecta cualquier cambio
+      - '**/**'
     branches:
       - main
       - test
@@ -18,15 +18,17 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Detect modified folder in root
+      - name: Detect modified service folder
         id: detect
         run: |
-          echo "CHANGED_DIR=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '/' | cut -d/ -f1 | sort -u | head -n1)" >> $GITHUB_ENV
-          echo "changed_dir=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '/' | cut -d/ -f1 | sort -u | head -n1)" >> $GITHUB_OUTPUT
+          SERVICE_DIR=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '/' | cut -d/ -f1 | sort -u | head -n1)
+          echo "changed_dir=$SERVICE_DIR" >> $GITHUB_OUTPUT
+          echo "📂 Carpeta modificada detectada: $SERVICE_DIR"
 
   deploy:
     needs: detect-changes
     runs-on: ubuntu-latest
+
     steps:
       - name: Deploy microservice to EC2
         uses: appleboy/ssh-action@v1.0.0
@@ -36,21 +38,31 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             SERVICE_DIR="${{ needs.detect-changes.outputs.changed-dir }}"
+
+            echo "🧩 Servicio modificado: $SERVICE_DIR"
+
+            if [ -z "$SERVICE_DIR" ]; then
+              echo "❌ No se detectó ninguna carpeta modificada. Abortando."
+              exit 1
+            fi
+
             REPO_CODE="https://github.com/Bryan03A/UserDomain.git"
             REPO_ENVS="https://${{ secrets.ENV_REPO_TOKEN }}@github.com/Bryan03A/DomainUsers-envs.git"
+            CODE_DIR="/home/ec2-user/deploy-code"
+            ENVS_DIR="/home/ec2-user/deploy-envs"
 
-            # Crear carpetas si no existen
-            mkdir -p ~/deploy-code
-            mkdir -p ~/deploy-envs
+            # Preparar estructura de carpetas
+            mkdir -p $CODE_DIR
+            mkdir -p $ENVS_DIR
 
-            cd ~/deploy-code
+            cd $CODE_DIR
             if [ -d "UserDomain" ]; then
               cd UserDomain && git pull origin main && cd ..
             else
               git clone $REPO_CODE
             fi
 
-            cd ~/deploy-envs
+            cd $ENVS_DIR
             if [ -d "DomainUsers-envs" ]; then
               cd DomainUsers-envs && git pull origin main && cd ..
             else
@@ -58,12 +70,17 @@ jobs:
             fi
 
             # Copiar archivo .env si existe
-            if [ -f "/home/ec2-user/deploy-envs/DomainUsers-envs/$SERVICE_DIR/.env" ]; then
-              cp "/home/ec2-user/deploy-envs/DomainUsers-envs/$SERVICE_DIR/.env" "/home/ec2-user/deploy-code/UserDomain/$SERVICE_DIR/.env"
+            if [ -f "$ENVS_DIR/DomainUsers-envs/$SERVICE_DIR/.env" ]; then
+              cp "$ENVS_DIR/DomainUsers-envs/$SERVICE_DIR/.env" "$CODE_DIR/UserDomain/$SERVICE_DIR/.env"
               echo "✅ .env copiado correctamente a $SERVICE_DIR"
             else
               echo "⚠️  No se encontró el archivo .env para $SERVICE_DIR"
             fi
 
-            echo "📦 Contenido del .env:"
-            cat "/home/ec2-user/deploy-code/UserDomain/$SERVICE_DIR/.env"
+            # Mostrar el contenido del .env copiado
+            if [ -f "$CODE_DIR/UserDomain/$SERVICE_DIR/.env" ]; then
+              echo "📦 Contenido del .env:"
+              cat "$CODE_DIR/UserDomain/$SERVICE_DIR/.env"
+            else
+              echo "❌ El archivo .env no se copió correctamente"
+            fi
