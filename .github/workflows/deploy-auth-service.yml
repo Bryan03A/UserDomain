@@ -7,6 +7,7 @@ on:
       - test
     paths:
       - 'auth-service/**'
+      - 'user-soap-service/**'
       - '.github/workflows/**'
 
 jobs:
