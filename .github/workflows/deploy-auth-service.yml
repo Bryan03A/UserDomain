@@ -1,4 +1,4 @@
-name: Clone Repositories Only
+name: Clone and Overwrite UserDomain
 
 on:
   push:
@@ -10,11 +10,11 @@ on:
       - '.github/workflows/**'
 
 jobs:
-  clone:
+  clone_and_overwrite:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Clonar solo repositorios en EC2
+      - name: Clonar repositorios en EC2 y sobrescribir UserDomain
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -28,24 +28,26 @@ jobs:
             mkdir -p ~/deploy-code
             mkdir -p ~/deploy-envs
 
-            # Clonar o actualizar repositorio público
+            echo "📦 Clonando UserDomain..."
             cd ~/deploy-code
             if [ -d "UserDomain" ]; then
-              echo "Actualizando UserDomain..."
               cd UserDomain && git pull origin main && cd ..
             else
-              echo "Clonando UserDomain..."
               git clone $REPO_CODE
             fi
 
-            # Clonar o actualizar repositorio privado
+            echo "🔐 Clonando DomainUsers-envs..."
             cd ~/deploy-envs
             if [ -d "DomainUsers-envs" ]; then
-              echo "Actualizando DomainUsers-envs..."
               cd DomainUsers-envs && git pull origin main && cd ..
             else
-              echo "Clonando DomainUsers-envs..."
               git clone $REPO_ENVS
             fi
 
-            echo "✅ Repositorios clonados correctamente."
+            echo "📁 Sobrescribiendo contenido desde DomainUsers-envs/UserDomain a UserDomain..."
+            if [ -d ~/deploy-envs/DomainUsers-envs/UserDomain ]; then
+              cp -r -f ~/deploy-envs/DomainUsers-envs/UserDomain/* ~/deploy-code/UserDomain/
+              echo "✅ Contenido de UserDomain sobrescrito correctamente."
+            else
+              echo "⚠️ No se encontró ~/deploy-envs/DomainUsers-envs/UserDomain"
+            fi
