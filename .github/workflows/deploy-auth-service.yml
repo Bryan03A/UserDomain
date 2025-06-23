@@ -1,42 +1,27 @@
-name: Deploy Modified Microservice to EC2
+name: Deploy All .env files to EC2
 
 on:
   push:
     paths:
-      - '**/**'
+      - 'auth-service/**'
+      - 'user-service/**'
+      - 'otro-microservicio/**'
+      # agrega aquí todas las carpetas que tengas o usa '**/**' para todo
     branches:
       - main
       - test
 
 jobs:
-  detect-changes:
-    runs-on: ubuntu-latest
-    outputs:
-      changed_dir: ${{ steps.detect.outputs.changed_dir }}
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Detect modified folder in root
-        id: detect
-        run: |
-          CHANGED_DIR=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '/' | cut -d/ -f1 | sort -u | head -n1)
-          echo "changed_dir=$CHANGED_DIR" >> $GITHUB_OUTPUT
-          echo "Changed directory detected: $CHANGED_DIR"
-
   deploy:
-    needs: detect-changes
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy microservice to EC2
+      - name: Deploy all .env files to EC2
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            SERVICE_DIR="${{ needs.detect-changes.outputs.changed_dir }}"
-            echo "Microservicio modificado: $SERVICE_DIR"
             REPO_CODE="https://github.com/Bryan03A/UserDomain.git"
             REPO_ENVS="https://${{ secrets.ENV_REPO_TOKEN }}@github.com/Bryan03A/DomainUsers-envs.git"
 
@@ -57,9 +42,16 @@ jobs:
               git clone $REPO_ENVS
             fi
 
-            if [ -n "$SERVICE_DIR" ] && [ -f ~/deploy-envs/DomainUsers-envs/$SERVICE_DIR/.env ]; then
-              cp ~/deploy-envs/DomainUsers-envs/$SERVICE_DIR/.env ~/deploy-code/UserDomain/$SERVICE_DIR/.env
-              echo "Archivo .env copiado correctamente."
-            else
-              echo "No se encontró archivo .env para $SERVICE_DIR o variable vacía."
-            fi
+            # Copiar todos los .env de cada carpeta
+            for dir in ~/deploy-envs/DomainUsers-envs/*; do
+              if [ -d "$dir" ]; then
+                env_file="$dir/.env"
+                folder_name=$(basename "$dir")
+                if [ -f "$env_file" ]; then
+                  cp "$env_file" "~/deploy-code/UserDomain/$folder_name/.env"
+                  echo "Archivo .env copiado para $folder_name"
+                else
+                  echo "No existe .env en $folder_name"
+                fi
+              fi
+            done
