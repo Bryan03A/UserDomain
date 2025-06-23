@@ -1,4 +1,4 @@
-name: Build and Push Microservices Sequentially
+name: Build and Push All Microservices Sequentially
 
 on:
   push:
@@ -6,16 +6,14 @@ on:
       - main
       - test
     paths:
-      - 'auth-service/**'
-      - 'user-soap-service/**'
-      - '.github/workflows/**'
+      - '**/**' # Detecta cambios en cualquier carpeta
 
 jobs:
   build_and_push:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Clone, Overwrite and Build One by One
+      - name: SSH into EC2 and Build/Push Microservices
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
