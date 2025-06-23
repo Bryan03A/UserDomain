@@ -1,21 +1,25 @@
-name: Deploy All .env files to EC2
+name: Deploy All Configs to EC2
 
 on:
   push:
-    paths:
-      - 'auth-service/**'
-      - 'user-service/**'
-      - 'otro-microservicio/**'
-      # agrega aquí todas las carpetas que tengas o usa '**/**' para todo
     branches:
       - main
       - test
+    paths:
+      - 'auth-service/**'
+      - 'connected-service/**'
+      - 'profile-image-service/**'
+      - 'session-service/**'
+      - 'user-search-service/**'
+      - 'user-soap-service/**'
+      - '.github/workflows/**'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Deploy all .env files to EC2
+      - name: Deploy all folders to EC2
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -28,6 +32,7 @@ jobs:
             mkdir -p ~/deploy-code
             mkdir -p ~/deploy-envs
 
+            echo "Clonando o actualizando repositorios..."
             cd ~/deploy-code
             if [ -d "UserDomain" ]; then
               cd UserDomain && git pull origin main && cd ..
@@ -42,16 +47,15 @@ jobs:
               git clone $REPO_ENVS
             fi
 
-            # Copiar todos los .env de cada carpeta
+            echo "Copiando contenido de cada carpeta..."
             for dir in ~/deploy-envs/DomainUsers-envs/*; do
               if [ -d "$dir" ]; then
-                env_file="$dir/.env"
                 folder_name=$(basename "$dir")
-                if [ -f "$env_file" ]; then
-                  cp "$env_file" "~/deploy-code/UserDomain/$folder_name/.env"
-                  echo "Archivo .env copiado para $folder_name"
-                else
-                  echo "No existe .env en $folder_name"
-                fi
+                target="$HOME/deploy-code/UserDomain/$folder_name"
+                mkdir -p "$target"
+                cp -r "$dir/"* "$target/"
+                echo "Contenido copiado de $folder_name"
               fi
             done
+
+            echo "✅ Todo copiado correctamente."
