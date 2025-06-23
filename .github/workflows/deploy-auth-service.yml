@@ -46,10 +46,14 @@ jobs:
               cp -r -f ~/deploy-envs/DomainUsers-envs/UserDomain/* ~/deploy-code/UserDomain/
             fi
 
+            docker login -u bfury0329 -p "${{ secrets.DOCKER_PASSWORD }}"
+
             cd ~/deploy-code/UserDomain
 
             for dir in */ ; do
               service=$(basename "$dir")
-              docker build -t bfury0329/${service}:latest "./$service"
-              docker push bfury0329/${service}:latest
+              if [ -f "$dir/Dockerfile" ]; then
+                docker build -t bfury0329/${service}:latest "./$dir"
+                docker push bfury0329/${service}:latest
+              fi
             done
