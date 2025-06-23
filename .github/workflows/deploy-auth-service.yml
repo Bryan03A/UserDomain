@@ -1,0 +1,49 @@
+name: Deploy auth-service on EC2
+
+on:
+  push:
+    paths:
+      - 'auth-service/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Variables
+            REPO_CODE="https://github.com/Bryan03A/UserDomain.git"
+            REPO_ENVS="https://${{ secrets.ENV_REPO_TOKEN }}@github.com/Bryan03A/DomainUsers-envs.git"
+            SERVICE_DIR="auth-service"
+            IMAGE_NAME="bfury0329/$SERVICE_DIR"
+
+            # Limpiar despliegue anterior
+            rm -rf ~/deploy-auth
+            mkdir ~/deploy-auth
+            cd ~/deploy-auth
+
+            # Clonar repositorios
+            git clone $REPO_CODE
+            git clone $REPO_ENVS
+
+            # Copiar .env al microservicio
+            cp DomainUsers-envs/$SERVICE_DIR/.env UserDomain/$SERVICE_DIR/.env
+
+            # Ir al microservicio y construir imagen
+            cd UserDomain/$SERVICE_DIR
+            docker stop $SERVICE_DIR || true
+            docker rm $SERVICE_DIR || true
+            docker rmi $IMAGE_NAME || true
+            docker build -t $IMAGE_NAME .
+
+            # Crear red si no existe
+            docker network inspect app-network >/dev/null 2>&1 || docker network create app-network
+
+            # Ejecutar nuevo contenedor
+            docker run -d --name $SERVICE_DIR --network app-network $IMAGE_NAME
