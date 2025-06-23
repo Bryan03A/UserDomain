@@ -13,7 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       changed_dir: ${{ steps.detect.outputs.changed_dir }}
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -21,14 +20,13 @@ jobs:
       - name: Detect modified folder in root
         id: detect
         run: |
-          # Detecta la primera carpeta raíz modificada
           CHANGED_DIR=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '/' | cut -d/ -f1 | sort -u | head -n1)
           echo "changed_dir=$CHANGED_DIR" >> $GITHUB_OUTPUT
+          echo "Changed directory detected: $CHANGED_DIR"
 
   deploy:
     needs: detect-changes
     runs-on: ubuntu-latest
-
     steps:
       - name: Deploy microservice to EC2
         uses: appleboy/ssh-action@v1.0.0
@@ -38,10 +36,9 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             SERVICE_DIR="${{ needs.detect-changes.outputs.changed_dir }}"
+            echo "Microservicio modificado: $SERVICE_DIR"
             REPO_CODE="https://github.com/Bryan03A/UserDomain.git"
             REPO_ENVS="https://${{ secrets.ENV_REPO_TOKEN }}@github.com/Bryan03A/DomainUsers-envs.git"
-
-            echo "Microservicio modificado: $SERVICE_DIR"
 
             mkdir -p ~/deploy-code
             mkdir -p ~/deploy-envs
@@ -60,9 +57,9 @@ jobs:
               git clone $REPO_ENVS
             fi
 
-            if [ -f ~/deploy-envs/DomainUsers-envs/$SERVICE_DIR/.env ]; then
+            if [ -n "$SERVICE_DIR" ] && [ -f ~/deploy-envs/DomainUsers-envs/$SERVICE_DIR/.env ]; then
               cp ~/deploy-envs/DomainUsers-envs/$SERVICE_DIR/.env ~/deploy-code/UserDomain/$SERVICE_DIR/.env
               echo "Archivo .env copiado correctamente."
             else
-              echo "No se encontró archivo .env para $SERVICE_DIR"
+              echo "No se encontró archivo .env para $SERVICE_DIR o variable vacía."
             fi
