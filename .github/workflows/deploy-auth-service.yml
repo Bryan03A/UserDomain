@@ -58,9 +58,12 @@ jobs:
             fi
 
             # Copiar archivo .env si existe
-            if [ -f ~/deploy-envs/DomainUsers-envs/$SERVICE_DIR/.env ]; then
-              cp ~/deploy-envs/DomainUsers-envs/$SERVICE_DIR/.env ~/deploy-code/UserDomain/$SERVICE_DIR/.env
-              echo "Archivo .env copiado correctamente."
+            if [ -f "/home/ec2-user/deploy-envs/DomainUsers-envs/$SERVICE_DIR/.env" ]; then
+              cp "/home/ec2-user/deploy-envs/DomainUsers-envs/$SERVICE_DIR/.env" "/home/ec2-user/deploy-code/UserDomain/$SERVICE_DIR/.env"
+              echo "✅ .env copiado correctamente a $SERVICE_DIR"
             else
-              echo "No se encontró archivo .env para $SERVICE_DIR"
+              echo "⚠️  No se encontró el archivo .env para $SERVICE_DIR"
             fi
+
+            echo "📦 Contenido del .env:"
+            cat "/home/ec2-user/deploy-code/UserDomain/$SERVICE_DIR/.env"
